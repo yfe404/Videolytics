@@ -5,6 +5,31 @@ provider:
   runtime: python3.6
   profile: ${file(../config.${self:provider.stage}.json):videolytics.profile}
 
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "rekognition:*"
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        Fn::Join:
+          - ''
+          - - ${self:provider.custom.videosBucketArn}
+            - '/*'
+
+  custom:
+    videosBucketArn:
+      Fn::Join:
+        - ':'
+        - - arn
+          - aws
+          - s3
+          - ''
+          - ''
+          - ${file(../config.${self:provider.stage}.json):videolytics.videos_bucket}
+
 functions:
   start-processing-video:
     handler: handler.start_processing_video
