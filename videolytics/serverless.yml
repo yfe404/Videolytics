@@ -16,19 +16,46 @@ provider:
       Resource:
         Fn::Join:
           - ''
-          - - ${self:provider.custom.videosBucketArn}
+          - - ${self:custom.videosBucketArn}
             - '/*'
+    - Effect: "Allow"
+      Action:
+        - iam:GetRole
+        - iam:PassRole
+      Resource:
+        Fn::GetAtt:
+          - RekognitionSNSPublishRole
+          - Arn
 
-  custom:
-    videosBucketArn:
-      Fn::Join:
-        - ':'
-        - - arn
-          - aws
-          - s3
-          - ''
-          - ''
-          - ${file(../config.${self:provider.stage}.json):videolytics.videos_bucket}
+  environment:
+    REKOGNITION_SNS_TOPIC_ARN: ${self:custom.rekognitionSNSTopicArn}
+    REKOGNITION_ROLE_ARN:
+      Fn::GetAtt:
+        - RekognitionSNSPublishRole
+        - Arn
+
+
+            
+custom:
+  rekognitionSNSTopicArn:
+    Fn::Join:
+      - ':'
+      - - arn
+        - aws
+        - sns
+        - Ref: AWS::Region
+        - Ref: AWS::AccountId
+        - handle-label-detection-topic
+          
+  videosBucketArn:
+    Fn::Join:
+      - ':'
+      - - arn
+        - aws
+        - s3
+        - ''
+        - ''
+        - ${file(../config.${self:provider.stage}.json):videolytics.videos_bucket}
 
 functions:
   start-processing-video:
@@ -39,3 +66,31 @@ functions:
           event: s3:ObjectCreated:*
           rules:
             - suffix: .mp4
+  handle-label-detection:
+    handler: handler.handle_label_detection
+    events:
+      - sns: handle-label-detection-topic
+        
+resources:
+  Resources:
+    RekognitionSNSPublishRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - rekognition.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: RekognitionSNSPublishPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - sns:Publish
+                  Resource: ${self:custom.rekognitionSNSTopicArn}
