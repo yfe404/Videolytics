@@ -1,0 +1,16 @@
+service: videolytics # NOTE: update this with your service name
+
+provider:
+  name: aws
+  runtime: python3.6
+  profile: ${file(../config.${self:provider.stage}.json):videolytics.profile}
+
+functions:
+  start-processing-video:
+    handler: handler.start_processing_video
+    events:
+      - s3:
+          bucket: ${file(../config.${self:provider.stage}.json):videolytics.videos_bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .mp4
